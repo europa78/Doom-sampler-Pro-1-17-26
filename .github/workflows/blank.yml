@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Colors */
             --bg-darkest: #0d0d0f;
             --bg-dark: #141416;
             --bg-mid: #1a1a1e;
@@ -27,6 +28,26 @@
             --yellow: #ffc107;
             --purple: #9c5fff;
             --orange: #ff9800;
+
+            /* Scale multiplier (~20% increase) */
+            --ui-scale: 1.2;
+
+            /* Base spacing */
+            --spacing-xs: calc(4px * var(--ui-scale));
+            --spacing-sm: calc(6px * var(--ui-scale));
+            --spacing-md: calc(10px * var(--ui-scale));
+            --spacing-lg: calc(16px * var(--ui-scale));
+
+            /* Font sizes */
+            --font-xs: calc(8px * var(--ui-scale));
+            --font-sm: calc(10px * var(--ui-scale));
+            --font-md: calc(12px * var(--ui-scale));
+            --font-lg: calc(14px * var(--ui-scale));
+
+            /* Component sizes */
+            --pad-height: calc(80px * var(--ui-scale));
+            --waveform-height: calc(110px * var(--ui-scale));
+            --button-height: calc(20px * var(--ui-scale));
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -256,7 +277,7 @@
         .pad-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex: 1; }
 
         .pad {
-            height: 68px;
+            height: var(--pad-height);
             background: linear-gradient(180deg, var(--bg-lighter) 0%, var(--bg-light) 100%);
             border-radius: 4px; cursor: pointer; position: relative;
             transition: all 0.1s ease; border: 1px solid var(--border);
@@ -268,21 +289,21 @@
         .pad.playing { background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%); border-color: var(--accent); }
         .pad.playing .pad-name, .pad.playing .pad-info { color: white; }
 
-        .pad-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 2px; }
-        .pad-midi-led { width: 6px; height: 6px; border-radius: 2px; background: var(--bg-darkest); border: 1px solid var(--border); }
+        .pad-header { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-xs) var(--spacing-sm) calc(var(--spacing-xs) / 2); }
+        .pad-midi-led { width: calc(7px * var(--ui-scale)); height: calc(7px * var(--ui-scale)); border-radius: 2px; background: var(--bg-darkest); border: 1px solid var(--border); }
         .pad.midi-triggered .pad-midi-led, .pad.playing .pad-midi-led { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
-        .pad-number { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-dim); font-weight: 500; }
+        .pad-number { font-family: 'JetBrains Mono', monospace; font-size: var(--font-xs); color: var(--text-dim); font-weight: 500; white-space: nowrap; }
         .pad.playing .pad-number { color: rgba(255,255,255,0.7); }
 
-        .pad-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 6px 2px; }
-        .pad-name { font-size: 10px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pad-info { font-size: 8px; color: var(--text-dim); margin-top: 1px; }
+        .pad-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 var(--spacing-sm) calc(var(--spacing-xs) / 2); }
+        .pad-name { font-size: var(--font-sm); font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pad-info { font-size: var(--font-xs); color: var(--text-dim); margin-top: 1px; }
 
-        .pad-transport { display: flex; gap: 2px; padding: 3px 6px 4px; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05); }
+        .pad-transport { display: flex; gap: 2px; padding: var(--spacing-xs) var(--spacing-sm); background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05); }
         .pad-transport-btn {
-            flex: 1; height: 16px; border: none; border-radius: 2px; cursor: pointer;
+            flex: 1; height: var(--button-height); border: none; border-radius: 2px; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            font-size: 8px; font-weight: 600; transition: all 0.1s;
+            font-size: var(--font-xs); font-weight: 600; transition: all 0.1s;
         }
         .pad-transport-btn.play-btn { background: var(--bg-light); color: var(--green); border: 1px solid var(--border); }
         .pad-transport-btn.play-btn:hover { background: var(--green); color: white; }
@@ -298,19 +319,19 @@
         .waveform-section { background: var(--bg-mid); border-top: 1px solid var(--border); padding: 10px 16px; }
         .waveform-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
         .waveform-title { display: flex; align-items: center; gap: 8px; }
-        .waveform-pad-indicator { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--bg-darkest); padding: 3px 8px; border-radius: 3px; }
-        .waveform-filename { font-size: 12px; color: var(--text-primary); font-weight: 500; }
+        .waveform-pad-indicator { font-family: 'JetBrains Mono', monospace; font-size: var(--font-md); font-weight: 600; color: var(--accent); background: var(--bg-darkest); padding: var(--spacing-xs) calc(var(--spacing-sm) + 2px); border-radius: 3px; }
+        .waveform-filename { font-size: var(--font-md); color: var(--text-primary); font-weight: 500; }
         .waveform-controls-top { display: flex; align-items: center; gap: 4px; }
 
         .wf-btn {
-            padding: 4px 8px; background: var(--bg-light); border: 1px solid var(--border);
-            border-radius: 3px; color: var(--text-secondary); font-size: 9px; font-weight: 500;
+            padding: var(--spacing-xs) calc(var(--spacing-sm) + 2px); background: var(--bg-light); border: 1px solid var(--border);
+            border-radius: 3px; color: var(--text-secondary); font-size: var(--font-sm); font-weight: 500;
             cursor: pointer; transition: all 0.1s; display: flex; align-items: center; gap: 3px;
         }
         .wf-btn:hover { background: var(--bg-lighter); color: var(--text-primary); }
         .wf-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
 
-        .waveform-display { position: relative; height: 90px; background: var(--bg-darkest); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+        .waveform-display { position: relative; height: var(--waveform-height); background: var(--bg-darkest); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
         .waveform-canvas { width: 100%; height: 100%; }
         .waveform-marker { position: absolute; top: 0; bottom: 0; width: 2px; cursor: ew-resize; z-index: 10; }
         .waveform-marker.start { left: 0; background: var(--green); }
@@ -1198,6 +1219,36 @@
         // =============================================
         // PAD GRID
         // =============================================
+        function getMidiNoteForPad(padIndex) {
+            // Find the MIDI note assigned to this pad
+            for (let note in midiNoteToPad) {
+                if (midiNoteToPad[note] === padIndex) {
+                    return parseInt(note);
+                }
+            }
+            return null;
+        }
+
+        function formatMidiNote(midiNote) {
+            if (midiNote === null || midiNote === undefined) return '';
+            const noteName = NOTE_NAMES[midiNote % 12];
+            const octave = Math.floor(midiNote / 12) - 1;
+            return `${noteName}${octave} (${midiNote})`;
+        }
+
+        function updatePadMidiDisplay() {
+            // Update all pad MIDI note displays
+            for (let i = 0; i < NUM_PADS; i++) {
+                const el = document.querySelector(`.pad[data-index="${i}"]`);
+                if (!el) continue;
+                const midiNote = getMidiNoteForPad(i);
+                const noteDisplay = el.querySelector('.pad-number');
+                if (noteDisplay) {
+                    noteDisplay.textContent = midiNote !== null ? formatMidiNote(midiNote) : `Pad ${i + 1}`;
+                }
+            }
+        }
+
         function generatePadGrid() {
             const grid = document.getElementById('pad-grid');
             grid.innerHTML = '';
@@ -2078,6 +2129,7 @@
                     midiNoteToPad[note] = selectedPad;
                     midiLearnMode = false;
                     document.getElementById('btn-midi-learn').classList.remove('active');
+                    updatePadMidiDisplay();
                 } else if (midiMode === 'slices' && sliceMidiMap.has(note)) {
                     triggerSliceByMidi(note, velocity);
                 } else if (midiNoteToPad.hasOwnProperty(note)) {
@@ -2096,6 +2148,7 @@
             for (let i = 0; i < NUM_PADS; i++) {
                 midiNoteToPad[start + i] = i;
             }
+            updatePadMidiDisplay();
         }
 
         // =============================================
