@@ -806,11 +806,48 @@
         let isDraggingMarker = false, activeMarker = null;
         let lfoAnimationFrame = null;
         let pendingLoadPadIndex = null;
+        let resizeDebounceTimeout = null;
+
+        // DOM Cache - Performance optimization
+        const domCache = {};
 
         // =============================================
         // INIT
         // =============================================
         function init() {
+            // Cache frequently accessed DOM elements
+            domCache.selectedPadNum = document.getElementById('selected-pad-num');
+            domCache.wfPadNum = document.getElementById('wf-pad-num');
+            domCache.wfFilename = document.getElementById('wf-filename');
+            domCache.lfoWaveform = document.getElementById('lfo-waveform');
+            domCache.lfoRouteLpf = document.getElementById('lfo-route-lpf');
+            domCache.lfoRouteHpf = document.getElementById('lfo-route-hpf');
+            domCache.btnLoop = document.getElementById('btn-loop');
+            domCache.btnReverse = document.getElementById('btn-reverse');
+            domCache.btnKeylock = document.getElementById('btn-keylock');
+            domCache.btnSync = document.getElementById('btn-sync');
+            domCache.hitpointContainer = document.getElementById('hitpoint-container');
+            domCache.sliceContainer = document.getElementById('slice-container');
+            domCache.hitCounter = document.getElementById('hit-counter');
+            domCache.btnPrevHit = document.getElementById('btn-prev-hit');
+            domCache.btnNextHit = document.getElementById('btn-next-hit');
+            domCache.waveformDisplay = document.getElementById('waveform-display');
+            domCache.waveformCanvas = document.getElementById('waveform-canvas');
+            domCache.markerStart = document.getElementById('marker-start');
+            domCache.markerEnd = document.getElementById('marker-end');
+            domCache.waveformRegionStart = document.getElementById('waveform-region-start');
+            domCache.waveformRegionActive = document.getElementById('waveform-region-active');
+            domCache.waveformRegionEnd = document.getElementById('waveform-region-end');
+            domCache.startTime = document.getElementById('start-time');
+            domCache.endTime = document.getElementById('end-time');
+            domCache.durationTime = document.getElementById('duration-time');
+            domCache.tempoValue = document.getElementById('tempo-value');
+            domCache.midiDot = document.getElementById('midi-dot');
+            domCache.pianoLastNote = document.getElementById('piano-last-note');
+            domCache.syncBadge = document.getElementById('sync-badge');
+            domCache.midiStatusText = document.getElementById('midi-status-text');
+
+
             generatePadGrid();
             generatePianoRoll();
             setupEncoders();
@@ -1036,7 +1073,19 @@
             const key = `${Math.round(size/10)*10}-${Math.round(decay/10)*10}-${Math.round(damping/20)*20}`;
             if (!reverbImpulseCache.has(key)) {
                 const impulse = generateReverbImpulse(size, decay, damping);
-                if (impulse) reverbImpulseCache.set(key, impulse);
+                if (impulse) {
+                    // Implement LRU cache with max size of 20 entries
+                    if (reverbImpulseCache.size >= 20) {
+                        const firstKey = reverbImpulseCache.keys().next().value;
+                        reverbImpulseCache.delete(firstKey);
+                    }
+                    reverbImpulseCache.set(key, impulse);
+                }
+            } else {
+                // Move to end (LRU)
+                const impulse = reverbImpulseCache.get(key);
+                reverbImpulseCache.delete(key);
+                reverbImpulseCache.set(key, impulse);
             }
             return reverbImpulseCache.get(key);
         }
@@ -1197,9 +1246,9 @@
 
         function updateUIForPad(index) {
             const pad = pads[index];
-            document.getElementById('selected-pad-num').textContent = index + 1;
-            document.getElementById('wf-pad-num').textContent = index + 1;
-            document.getElementById('wf-filename').textContent = pad.name || 'No sample loaded';
+            domCache.selectedPadNum.textContent = index + 1;
+            domCache.wfPadNum.textContent = index + 1;
+            domCache.wfFilename.textContent = pad.name || 'No sample loaded';
 
             // Update encoders
             setEncoderValue('enc-volume', pad.volume);
@@ -1221,13 +1270,13 @@
             setEncoderValue('enc-reverbMix', pad.reverbMix);
 
             // Update toggles
-            document.getElementById('lfo-waveform').value = pad.lfoWaveform;
-            document.getElementById('lfo-route-lpf').classList.toggle('active', pad.lfoRouteLPF);
-            document.getElementById('lfo-route-hpf').classList.toggle('active', pad.lfoRouteHPF);
-            document.getElementById('btn-loop').classList.toggle('active', pad.loopMode);
-            document.getElementById('btn-reverse').classList.toggle('active', pad.reverse);
-            document.getElementById('btn-keylock').classList.toggle('active', pad.keylock);
-            document.getElementById('btn-sync').classList.toggle('active', pad.synced);
+            domCache.lfoWaveform.value = pad.lfoWaveform;
+            domCache.lfoRouteLpf.classList.toggle('active', pad.lfoRouteLPF);
+            domCache.lfoRouteHpf.classList.toggle('active', pad.lfoRouteHPF);
+            domCache.btnLoop.classList.toggle('active', pad.loopMode);
+            domCache.btnReverse.classList.toggle('active', pad.reverse);
+            domCache.btnKeylock.classList.toggle('active', pad.keylock);
+            domCache.btnSync.classList.toggle('active', pad.synced);
 
             // Update waveform
             if (pad.buffer) {
@@ -1238,8 +1287,8 @@
                 renderSliceRegions();
             } else {
                 clearWaveform();
-                document.getElementById('hitpoint-container').innerHTML = '';
-                document.getElementById('slice-container').innerHTML = '';
+                domCache.hitpointContainer.innerHTML = '';
+                domCache.sliceContainer.innerHTML = '';
             }
             updateHitPointDisplay();
         }
@@ -1359,8 +1408,8 @@
                 el.classList.add('midi-triggered');
                 setTimeout(() => el.classList.remove('midi-triggered'), 100);
             }
-            document.getElementById('midi-dot').classList.add('active');
-            setTimeout(() => document.getElementById('midi-dot').classList.remove('active'), 100);
+            domCache.midiDot.classList.add('active');
+            setTimeout(() => domCache.midiDot.classList.remove('active'), 100);
         }
 
         function calculatePlaybackRate(pad) {
@@ -1386,12 +1435,14 @@
         // HIT POINTS & SLICES
         // =============================================
         function renderHitPointMarkers() {
-            const container = document.getElementById('hitpoint-container');
+            const container = domCache.hitpointContainer;
             container.innerHTML = '';
             const pad = pads[selectedPad];
             if (!pad.buffer || pad.hitPoints.length === 0) return;
-            
-            const width = document.getElementById('waveform-display').offsetWidth;
+
+            const width = domCache.waveformDisplay.offsetWidth;
+            const fragment = document.createDocumentFragment();
+
             pad.hitPoints.forEach((pos, i) => {
                 const marker = document.createElement('div');
                 marker.className = 'hitpoint-marker' + (i === pad.currentHitIndex ? ' selected' : '');
@@ -1399,18 +1450,22 @@
                 marker.dataset.index = i;
                 marker.addEventListener('click', e => { e.stopPropagation(); selectHitPoint(i); });
                 marker.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); startHitpointDrag(i); });
-                container.appendChild(marker);
+                fragment.appendChild(marker);
             });
+
+            container.appendChild(fragment);
             updateHitPointDisplay();
         }
 
         function renderSliceRegions() {
-            const container = document.getElementById('slice-container');
+            const container = domCache.sliceContainer;
             container.innerHTML = '';
             const pad = pads[selectedPad];
             if (!pad.buffer || pad.hitPoints.length === 0) return;
-            
-            const width = document.getElementById('waveform-display').offsetWidth;
+
+            const width = domCache.waveformDisplay.offsetWidth;
+            const fragment = document.createDocumentFragment();
+
             for (let i = 0; i < pad.hitPoints.length; i++) {
                 const startPos = pad.hitPoints[i];
                 const endPos = i < pad.hitPoints.length - 1 ? pad.hitPoints[i + 1] : 1;
@@ -1425,8 +1480,10 @@
                 region.innerHTML = `<div class="slice-midi-badge">${noteName}</div><div class="slice-region-label">${i + 1}</div>`;
                 region.addEventListener('click', e => { e.stopPropagation(); selectHitPoint(i); });
                 region.addEventListener('dblclick', e => { e.stopPropagation(); playSlice(i); });
-                container.appendChild(region);
+                fragment.appendChild(region);
             }
+
+            container.appendChild(fragment);
         }
 
         function selectHitPoint(index) {
@@ -1438,9 +1495,9 @@
         function updateHitPointDisplay() {
             const pad = pads[selectedPad];
             const total = pad.hitPoints.length;
-            document.getElementById('hit-counter').textContent = `${total > 0 ? pad.currentHitIndex + 1 : 0}/${total}`;
-            document.getElementById('btn-prev-hit').disabled = pad.currentHitIndex <= 0;
-            document.getElementById('btn-next-hit').disabled = pad.currentHitIndex >= total - 1;
+            domCache.hitCounter.textContent = `${total > 0 ? pad.currentHitIndex + 1 : 0}/${total}`;
+            domCache.btnPrevHit.disabled = pad.currentHitIndex <= 0;
+            domCache.btnNextHit.disabled = pad.currentHitIndex >= total - 1;
         }
 
         function startHitpointDrag(index) {
@@ -1452,8 +1509,7 @@
         function handleHitpointDrag(e) {
             if (!isDraggingHitpoint) return;
             const pad = pads[selectedPad];
-            const display = document.getElementById('waveform-display');
-            const rect = display.getBoundingClientRect();
+            const rect = domCache.waveformDisplay.getBoundingClientRect();
             let newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             const prevPos = draggingHitpointIndex > 0 ? pad.hitPoints[draggingHitpointIndex - 1] + 0.005 : 0;
             const nextPos = draggingHitpointIndex < pad.hitPoints.length - 1 ? pad.hitPoints[draggingHitpointIndex + 1] - 0.005 : 1;
@@ -1594,17 +1650,17 @@
         // WAVEFORM
         // =============================================
         function drawWaveform(buffer, isSlice = false) {
-            const canvas = document.getElementById('waveform-canvas');
+            const canvas = domCache.waveformCanvas;
             const ctx = canvas.getContext('2d');
             canvas.width = canvas.offsetWidth * 2;
             canvas.height = canvas.offsetHeight * 2;
             ctx.scale(2, 2);
-            
+
             const w = canvas.offsetWidth, h = canvas.offsetHeight;
             const data = buffer.getChannelData(0);
             const step = Math.ceil(data.length / w);
             const amp = h / 2;
-            
+
             ctx.fillStyle = '#0d0d0f';
             ctx.fillRect(0, 0, w, h);
             ctx.strokeStyle = '#222226';
@@ -1612,13 +1668,16 @@
             ctx.moveTo(0, amp);
             ctx.lineTo(w, amp);
             ctx.stroke();
-            
+
             ctx.strokeStyle = isSlice ? '#9c5fff' : '#e84a35';
             ctx.beginPath();
+            const maxJ = Math.min(step, data.length);
             for (let i = 0; i < w; i++) {
                 let min = 1, max = -1;
-                for (let j = 0; j < step; j++) {
-                    const d = data[i * step + j] || 0;
+                const baseIdx = i * step;
+                const endIdx = Math.min(baseIdx + step, data.length);
+                for (let j = baseIdx; j < endIdx; j++) {
+                    const d = data[j];
                     if (d < min) min = d;
                     if (d > max) max = d;
                 }
@@ -1629,7 +1688,7 @@
         }
 
         function clearWaveform() {
-            const canvas = document.getElementById('waveform-canvas');
+            const canvas = domCache.waveformCanvas;
             const ctx = canvas.getContext('2d');
             canvas.width = canvas.offsetWidth * 2;
             canvas.height = canvas.offsetHeight * 2;
@@ -1640,24 +1699,24 @@
 
         function updateMarkerPositions() {
             const pad = pads[selectedPad];
-            const w = document.getElementById('waveform-display').offsetWidth;
+            const w = domCache.waveformDisplay.offsetWidth;
             const sp = pad.startPoint * w, ep = pad.endPoint * w;
-            document.getElementById('marker-start').style.left = sp + 'px';
-            document.getElementById('marker-end').style.left = ep + 'px';
-            document.getElementById('waveform-region-start').style.width = sp + 'px';
-            document.getElementById('waveform-region-active').style.left = sp + 'px';
-            document.getElementById('waveform-region-active').style.width = (ep - sp) + 'px';
-            document.getElementById('waveform-region-end').style.left = ep + 'px';
-            document.getElementById('waveform-region-end').style.width = (w - ep) + 'px';
+            domCache.markerStart.style.left = sp + 'px';
+            domCache.markerEnd.style.left = ep + 'px';
+            domCache.waveformRegionStart.style.width = sp + 'px';
+            domCache.waveformRegionActive.style.left = sp + 'px';
+            domCache.waveformRegionActive.style.width = (ep - sp) + 'px';
+            domCache.waveformRegionEnd.style.left = ep + 'px';
+            domCache.waveformRegionEnd.style.width = (w - ep) + 'px';
         }
 
         function updateTimeDisplays() {
             const pad = pads[selectedPad];
             if (!pad.buffer) return;
             const dur = pad.buffer.duration;
-            document.getElementById('start-time').textContent = formatTime(pad.startPoint * dur);
-            document.getElementById('end-time').textContent = formatTime(pad.endPoint * dur);
-            document.getElementById('duration-time').textContent = formatTime((pad.endPoint - pad.startPoint) * dur);
+            domCache.startTime.textContent = formatTime(pad.startPoint * dur);
+            domCache.endTime.textContent = formatTime(pad.endPoint * dur);
+            domCache.durationTime.textContent = formatTime((pad.endPoint - pad.startPoint) * dur);
         }
 
         function formatTime(s) {
@@ -1903,7 +1962,7 @@
                     break;
                 case 'tempo':
                     masterTempo = val;
-                    document.getElementById('tempo-value').textContent = val.toFixed(2);
+                    domCache.tempoValue.textContent = val.toFixed(2);
                     break;
             }
         }
@@ -1992,25 +2051,25 @@
             if (activeMidiInput) activeMidiInput.onmidimessage = null;
             activeMidiInput = input;
             activeMidiInput.onmidimessage = handleMIDIMessage;
-            document.getElementById('midi-dot').classList.add('connected');
-            document.getElementById('midi-status-text').textContent = input.name.slice(0, 10);
+            domCache.midiDot.classList.add('connected');
+            domCache.midiStatusText.textContent = input.name.slice(0, 10);
         }
 
         function handleMIDIMessage(event) {
             const [status, note, velocity] = event.data;
             const command = status >> 4;
-            
+
             if (command === 9 && velocity > 0) {
-                document.getElementById('midi-dot').classList.add('active');
-                setTimeout(() => document.getElementById('midi-dot').classList.remove('active'), 100);
+                domCache.midiDot.classList.add('active');
+                setTimeout(() => domCache.midiDot.classList.remove('active'), 100);
 
                 flashPianoKey(note, true);
                 setTimeout(() => flashPianoKey(note, false), 200);
 
                 const noteName = NOTE_NAMES[note % 12] + (Math.floor(note / 12) - 1);
-                document.getElementById('piano-last-note').textContent = noteName;
-                document.getElementById('piano-last-note').classList.add('active');
-                setTimeout(() => document.getElementById('piano-last-note').classList.remove('active'), 200);
+                domCache.pianoLastNote.textContent = noteName;
+                domCache.pianoLastNote.classList.add('active');
+                setTimeout(() => domCache.pianoLastNote.classList.remove('active'), 200);
 
                 if (midiLearnMode) {
                     Object.keys(midiNoteToPad).forEach(k => {
@@ -2025,7 +2084,7 @@
                     triggerPad(midiNoteToPad[note], velocity);
                 }
             }
-            
+
             if (command === 8 || (command === 9 && velocity === 0)) {
                 flashPianoKey(note, false);
             }
@@ -2083,7 +2142,7 @@
             document.getElementById('btn-sync').addEventListener('click', function() {
                 this.classList.toggle('active');
                 pads[selectedPad].synced = this.classList.contains('active');
-                document.getElementById('sync-badge').classList.toggle('active', this.classList.contains('active'));
+                domCache.syncBadge.classList.toggle('active', this.classList.contains('active'));
             });
 
             // Hit point buttons
@@ -2234,13 +2293,16 @@
                 }
             });
 
-            // Window resize
+            // Window resize (debounced for performance)
             window.addEventListener('resize', () => {
-                if (pads[selectedPad].buffer) {
-                    updateMarkerPositions();
-                    renderHitPointMarkers();
-                    renderSliceRegions();
-                }
+                clearTimeout(resizeDebounceTimeout);
+                resizeDebounceTimeout = setTimeout(() => {
+                    if (pads[selectedPad].buffer) {
+                        updateMarkerPositions();
+                        renderHitPointMarkers();
+                        renderSliceRegions();
+                    }
+                }, 150);
             });
         }
 
